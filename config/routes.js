@@ -17,95 +17,129 @@ router.post('/auth/facebook', function(req, res) {
   };
   // Step 1\. Exchange authorization code for access token.
   request.post({ url: accessTokenUrl, form: params, json: true }, function(error, response, body) {
-    // Step 2a. Link user accounts.
-    if (req.headers.authorization) {
+    console.log(body)
 
-      User.findOne({ facebookId: body.user.id }, function(err, existingUser) {
+    request.get({ url: 'https://graph.facebook.com/me', qs: { access_token: body.access_token }, json: true }, function(error, response) {
+      if (error) {
+        console.log(error)
+      } else if (!error && response.statusCode == 200) {
+        console.log(response.statusCode)
+        console.log(response.body.name)
+        console.log(response.body.id)
 
-        var token = req.headers.authorization.split(' ')[1];
-        var payload = jwt.decode(token, process.env.TOKEN_SECRET);
+        // Step 2a. Link user accounts.
+        if (req.headers.authorization) {
+          console.log('req header auth:', req.headers.authorization.split(' ')[1])
+          User.findOne({ facebookId: response.body.id }, function(err, existingUser) {
 
-        User.findById(payload.sub, '+password', function(err, localUser) {
-          if (!localUser) {
-            return res.status(400).send({ message: 'User not found.' });
-          }
+            var token = req.headers.authorization.split(' ')[1];
+            var payload = jwt.decode(token, process.env.TOKEN_SECRET);
 
-          // Merge two accounts.
-          if (existingUser) {
+            User.findById(payload.sub, '+password', function(err, localUser) {
+              if (!localUser) {
+                return res.status(400).send({ message: 'User not found.' });
+              }
 
-            existingUser.email = localUser.email;
-            existingUser.password = localUser.password;
+              // Merge two accounts.
+              if (existingUser) {
 
-            localUser.remove();
+                existingUser.facebookId = localUser.facebookId;
+                existingUser.name = localUser.name;
+                existingUser.facebookAccessToken = localUser.facebookAccessToken
 
-            existingUser.save(function() {
+                localUser.remove();
+
+                existingUser.save(function() {
+                  var token = createToken(existingUser);
+                  return res.send({ token: token, user: existingUser });
+                });
+
+              } else {
+                // Link current email account with the Instagram profile information.
+                localUser.facebookId = response.body.id;
+                localUser.name = response.body.name;
+                localUser.facebookAccessToken = body.access_token;
+
+                localUser.save(function() {
+                  var token = createToken(localUser);
+                  res.send({ token: token, user: localUser });
+                });
+
+              }
+            });
+          });
+        } else {
+          // Step 2b. Create a new user account or return an existing one.
+          User.findOne({ facebookId: response.body.id }, function(err, existingUser) {
+
+            if (existingUser) {
               var token = createToken(existingUser);
-              return res.send({ token: token, user: existingUser });
-            });
+              existingUser.facebookAccessToken = body.access_token
+              console.log(existingUser.facebookAccessToken)
+              existingUser.save(function(err, savedUser) {
+                if (err) console.log(err);
+                res.send({ token: token, user: savedUser });
+              })
+            } else {
+              var user = new User({
+                facebookId: response.body.id,
+                name: response.body.name,
+                facebookAccessToken: body.access_token
+              });
 
-          } else {
-            // Link current email account with the Instagram profile information.
-            localUser.facebookId = body.user.id;
-            localUser.username = body.user.username;
-            localUser.fullName = body.user.full_name;
-            localUser.picture = body.user.profile_picture;
-            localUser.accessToken = body.access_token;
-
-            localUser.save(function() {
-              var token = createToken(localUser);
-              res.send({ token: token, user: localUser });
-            });
-
-          }
-        });
-      });
-    } else {
-      // Step 2b. Create a new user account or return an existing one.
-      User.findOne({ facebookId: body.user.id }, function(err, existingUser) {
-        if (existingUser) {
-          var token = createToken(existingUser);
-          return res.send({ token: token, user: existingUser });
+              user.save(function(err, savedUser) {
+                if(err) console.log(err);
+                var token = createToken(user);
+                res.send({ token: token, user: user });
+              });
+            }
+          });
         }
-
-        var user = new User({
-          facebookId: body.user.id,
-          username: body.user.username,
-          fullName: body.user.full_name,
-          picture: body.user.profile_picture,
-          accessToken: body.access_token
-        });
-
-        user.save(function() {
-          var token = createToken(user);
-          res.send({ token: token, user: user });
-        });
-      });
-    }
+      } else {
+        console.log('error:', response.statusCode)
+      }
+    })
   });
+});
+
+router.get('/api/facebook/feed', isAuthenticated, function(req, res) {
+  var params = { access_token: req.user.facebookAccessToken };
+  var feedUrl = 'https://graph.facebook.com/me/feed/?access_token=' + params.access_token
+  console.log(req.user.facebookAccessToken)
+  request.get(feedUrl, function(error, response, body) {
+    if (error) {
+      console.log(error)
+    } else if (!error && response.statusCode == 200) {
+      console.log(response.statusCode)
+      console.log(JSON.parse(body).data)
+      res.send(JSON.parse(body).data);
+    } else {
+      console.log('error:', response.statusCode)
+    }
+  })
 });
 
 router.post('/auth/instagram', function(req, res) {
   var accessTokenUrl = 'https://api.instagram.com/oauth/access_token';
-  console.log(req.headers)
 
   var params = {
     client_id: req.body.clientId,
     redirect_uri: req.body.redirectUri,
-    client_secret: 'a5ce3b0ce6e240cfbef9c8a810e8c645',
+    client_secret: process.env.CLIENT_SECRET,
     code: req.body.code,
     grant_type: 'authorization_code'
   };
 
   // Step 1\. Exchange authorization code for access token.
   request.post({ url: accessTokenUrl, form: params, json: true }, function(error, response, body) {
-
+    console.log('response body:', body);
     // Step 2a. Link  user accounts.
     if (req.headers.authorization) {
+
       User.findOne({ instagramId: body.user.id }, function(err, existingUser) {
 
         var token = req.headers.authorization.split(' ')[1];
         var payload = jwt.decode(token, process.env.TOKEN_SECRET);
-
         User.findById(payload.sub, '+password', function(err, localUser) {
           if (!localUser) {
             return res.status(400).send({ message: 'User not found.' });
@@ -114,8 +148,11 @@ router.post('/auth/instagram', function(req, res) {
           // Merge two accounts.
           if (existingUser) {
 
-            existingUser.email = localUser.email;
-            existingUser.password = localUser.password;
+            existingUser.instagramId = localUser.instagramId
+            existingUser.username = localUser.username
+            existingUser.fullName = localUser.fullName
+            existingUser.picture = localUser.picture
+            existingUser.InstagramAccessToken = localUser.InstagramAccessToken
 
             localUser.remove();
 
@@ -131,7 +168,7 @@ router.post('/auth/instagram', function(req, res) {
             localUser.username = body.user.username;
             localUser.fullName = body.user.full_name;
             localUser.picture = body.user.profile_picture;
-            localUser.accessToken = body.access_token;
+            localUser.InstagramAccessToken = body.access_token;
 
             localUser.save(function() {
               var token = createToken(localUser);
@@ -144,44 +181,47 @@ router.post('/auth/instagram', function(req, res) {
     } else {
       // Step 2b. Create a new user account or return an existing one.
       User.findOne({ instagramId: body.user.id }, function(err, existingUser) {
-        console.log(existingUser)
+
         if (existingUser) {
-          console.log('found user')
           var token = createToken(existingUser);
-          return res.send({ token: token, user: existingUser });
+          existingUser.InstagramAccessToken = body.access_token
+          console.log(existingUser.InstagramAccessToken)
+          existingUser.save(function(err, savedUser) {
+            if (err) console.log(err);
+            res.send({ token: token, user: savedUser });
+          })
+        } else {
+          var user = new User({
+            instagramId: body.user.id,
+            username: body.user.username,
+            fullName: body.user.full_name,
+            picture: body.user.profile_picture,
+            InstagramAccessToken: body.access_token
+          });
+          user.save(function(err, savedUser) {
+            if(err) console.log(err);
+            var token = createToken(user);
+            res.send({ token: token, user: user });
+          });
         }
-        console.log('creating new user')
-        var user = new User({
-          instagramId: body.user.id,
-          username: body.user.username,
-          fullName: body.user.full_name,
-          picture: body.user.profile_picture,
-          accessToken: body.access_token
-        });
-        console.log(user)
-        user.save(function(err, savedUser) {
-          if(err) console.log(err);
-          console.log(savedUser)
-          var token = createToken(user);
-          res.send({ token: token, user: user });
-        });
       });
     }
   });
 });
 
-router.get('/api/feed', isAuthenticated, function(req, res) {
-  var feedUrl = 'https://api.instagram.com/v1/users/self/'
-  var params = { access_token: req.user.accessToken };
+router.get('/api/instagram/feed', isAuthenticated, function(req, res) {
+  var feedUrl = 'https://api.instagram.com/v1/users/self/media/recent'
+  var params = { access_token: req.user.InstagramAccessToken };
 
-  request.get({ url: feedUrl, qs: params, json: true }, function(error, response, body) {
+  request.get({ url: feedUrl, qs: params, json: true}, function(error, response, body) {
     if (error) {
       console.log(error)
     } else if (!error && response.statusCode == 200) {
-      console.log(response.statusCode)
+      console.log('success:', response.statusCode)
+      console.log(body.data)
       res.send(body.data);
     } else {
-      console.log('error:', response.statusCode)
+      console.log('error:', response.statusCode, response)
     }
   })
 });
