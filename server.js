@@ -1,15 +1,18 @@
-var express = require('express');
-var path = require('path');
-var favicon = require('serve-favicon');
-var logger = require('morgan');
+var express      = require('express');
+var path         = require('path');
+var favicon      = require('serve-favicon');
+var logger       = require('morgan');
 var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
-var mongoose = require('mongoose');
-var bcrypt = require('bcryptjs');
-var cors = require('cors');
-var jwt = require('jwt-simple');
-var moment = require('moment');
-var request = require('request');
+var bodyParser   = require('body-parser');
+var mongoose     = require('mongoose');
+var bcrypt       = require('bcryptjs');
+var cors         = require('cors');
+var jwt          = require('jwt-simple');
+var moment       = require('moment');
+var request      = require('request');
+
+require('dotenv').config()
+mongoose.connect('mongodb://localhost/gathyr2');
 
 var routes = require('./config/routes');
 
@@ -20,7 +23,7 @@ app.set('view engine', 'jade');
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
-app.use(cors)
+app.use(cors());
 app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -59,14 +62,5 @@ app.use(function(err, req, res, next) {
     error: {}
   });
 });
-
-function createToken(user) {
-  var payload = {
-    exp: moment().add(14, 'days').unix(),
-    iat: moment().unix(),
-    sub: user._id
-  };
-  return jwt.encode(payload, config.tokenSecret);
-}
 
 module.exports = app;
