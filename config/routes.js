@@ -323,7 +323,7 @@ router.post('/auth/twitter', function(req, res) {
     });
   }
 });
-
+// This is part of the setup for /api/twitter/feed
 var client = new Twitter({
   consumer_key: 'HxYPEZHZ0NHd2ugkTv3673Q1N',
   consumer_secret: 'kYI41jMq3hQ2uN5FSHOAIsrZRNSCFaJgcC4ir8fcU2Ixovp4FZ',
@@ -331,35 +331,18 @@ var client = new Twitter({
   access_token_secret: 'B6aOKqTn4oXV1kvZN0pkBNAdqT7c9qSPiyGDm1aQess8P'
 })
 
-
 router.get('/api/twitter/feed', isAuthenticated, function(req, res) {
 
   client.get('statuses/home_timeline', {screen_name: '_AndrewFranklin'}, function(err, tweets, response) {
     if (err) console.log(err);
-    console.log(tweets[0])
+    tweets.forEach(function(tweet) {
+      console.log('user: {', tweet.user, '}');
+    })
+    tweets.forEach(function(tweet) {
+      console.log('text: {', tweet.text, '}');
+    })
+    res.send(tweets)
   })
-
-
-
-
-
-
-
-
-  // var feedUrl = 'https://api.twitter.com/1.1/statuses/home_timeline.json'
-  // var params = { id: req.user.twitter.id, access_token: req.user.twitter.accessToken };
-  // console.log('twitter id:', req.user.twitter.id)
-  // request.get({ url: feedUrl, qs: params, json: true }, function(error, response, body) {
-  //   if (error) {
-  //     console.log(error)
-  //   } else if (!error && response.statusCode == 200) {
-  //     console.log(body)
-  //     res.send(body);
-  //   } else {
-  //     console.log('response:', response);
-  //     console.log('statusCode:', response.statusCode)
-  //   }
-  // })
 })
 
 module.exports = router;
