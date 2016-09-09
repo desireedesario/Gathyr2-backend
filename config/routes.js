@@ -13,7 +13,7 @@ router.post('/auth/facebook', function(req, res) {
   var params = {
     client_id: req.body.clientId,
     redirect_uri: req.body.redirectUri,
-    client_secret: '470283e47e7550bfed2c5feb73a9bd35',
+    client_secret: process.env.FACEBOOK_CLIENT_SECRET,
     code: req.body.code,
     grant_type: 'authorization_code'
   };
@@ -235,7 +235,7 @@ router.post('/auth/twitter', function(req, res) {
   if (!req.body.oauth_token || !req.body.oauth_verifier) {
     var requestTokenOauth = {
       consumer_key: 'HxYPEZHZ0NHd2ugkTv3673Q1N',
-      consumer_secret: 'kYI41jMq3hQ2uN5FSHOAIsrZRNSCFaJgcC4ir8fcU2Ixovp4FZ',
+      consumer_secret: process.env.TWITTER_CLIENT_SECRET,
       callback: req.body.redirectUri
     };
 
@@ -250,7 +250,7 @@ router.post('/auth/twitter', function(req, res) {
     // Part 2 of 2: Second request after Authorize app is clicked.
     var accessTokenOauth = {
       consumer_key: 'HxYPEZHZ0NHd2ugkTv3673Q1N',
-      consumer_secret: 'kYI41jMq3hQ2uN5FSHOAIsrZRNSCFaJgcC4ir8fcU2Ixovp4FZ',
+      consumer_secret: process.env.TWITTER_CLIENT_SECRET,
       token: req.body.oauth_token,
       verifier: req.body.oauth_verifier
     };
@@ -263,7 +263,7 @@ router.post('/auth/twitter', function(req, res) {
 
       var profileOauth = {
         consumer_key: 'HxYPEZHZ0NHd2ugkTv3673Q1N',
-        consumer_secret: 'kYI41jMq3hQ2uN5FSHOAIsrZRNSCFaJgcC4ir8fcU2Ixovp4FZ',
+        consumer_secret: process.env.TWITTER_CLIENT_SECRET,
         token: accessToken.oauth_token,
         token_secret: accessToken.oauth_token_secret,
       };
@@ -326,7 +326,7 @@ router.post('/auth/twitter', function(req, res) {
 // This is part of the setup for /api/twitter/feed
 var client = new Twitter({
   consumer_key: 'HxYPEZHZ0NHd2ugkTv3673Q1N',
-  consumer_secret: 'kYI41jMq3hQ2uN5FSHOAIsrZRNSCFaJgcC4ir8fcU2Ixovp4FZ',
+  consumer_secret: process.env.TWITTER_CLIENT_SECRET,
   access_token_key: '770331880390467584-Je5HUzMal5ZIauw8aXlqPVGjq76fVb6',
   access_token_secret: 'B6aOKqTn4oXV1kvZN0pkBNAdqT7c9qSPiyGDm1aQess8P'
 })
