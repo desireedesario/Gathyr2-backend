@@ -12,7 +12,8 @@ var moment       = require('moment');
 var request      = require('request');
 
 require('dotenv').config()
-mongoose.connect('mongodb://localhost/gathyr2');
+var db = process.env.MONGODB_URI || 'mongodb://localhost/gathyr2'
+mongoose.connect(db);
 
 var routes = require('./config/routes');
 
