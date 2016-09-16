@@ -19,7 +19,7 @@ router.post('/auth/facebook', function(req, res) {
   };
   // Step 1\. Exchange authorization code for access token.
   request.post({ url: accessTokenUrl, form: params, json: true }, function(error, response, body) {
-    console.log(body)
+    if (error) console.log(error)
 
     request.get({ url: 'https://graph.facebook.com/me', qs: { access_token: body.access_token }, json: true }, function(error, response) {
       if (error) {
@@ -33,6 +33,7 @@ router.post('/auth/facebook', function(req, res) {
         if (req.headers.authorization) {
           console.log('req header auth:', req.headers.authorization.split(' ')[1])
           User.findOne({ facebook: { id: response.body.id }}, function(err, existingUser) {
+            if (err) console.log(err)
 
             var token = req.headers.authorization.split(' ')[1];
             var payload = jwt.decode(token, process.env.TOKEN_SECRET);
@@ -73,6 +74,7 @@ router.post('/auth/facebook', function(req, res) {
         } else {
           // Step 2b. Create a new user account or return an existing one.
           User.findOne({ facebook: { id: response.body.id }}, function(err, existingUser) {
+            if (err) console.log(err)
 
             if (existingUser) {
               var token = createToken(existingUser);
@@ -120,7 +122,6 @@ router.get('/api/facebook/feed', isAuthenticated, function(req, res) {
   })
 });
 
-// much of /auth/instagram came from https://hackhands.com/building-instagram-clone-angularjs-satellizer-nodejs-mongodb/
 router.post('/auth/instagram', function(req, res) {
   var accessTokenUrl = 'https://api.instagram.com/oauth/access_token';
 
@@ -286,18 +287,18 @@ router.post('/auth/twitter', function(req, res) {
             var token = req.header('Authorization').split(' ')[1];
             var payload = jwt.decode(token, process.env.TOKEN_SECRET);
 
-            User.findById(payload.sub, function(err, user) {
-              if (!user) {
+            User.findById(payload.sub, function(err, existingUser) {
+              if (!existingUser) {
                 return res.status(400).send({ message: 'User not found' });
               }
 
-              user.twitter.id = profile.id;
-              user.twitter.email = profile.email;
-              user.twitter.displayName = user.displayName || profile.name;
-              user.twitter.picture = user.picture || profile.profile_image_url_https.replace('_normal', '');
-              user.twitter.accessToken = profile.accessToken
-              user.save(function(err) {
-                res.send({ token: createToken(user) });
+              existingUser.twitter.id = profile.id;
+              existingUser.twitter.email = profile.email;
+              existingUser.twitter.displayName = profile.name;
+              existingUser.twitter.picture = profile.profile_image_url_https.replace('_normal', '');
+              existingUser.twitter.accessToken = profile.accessToken
+              existingUser.save(function(err) {
+                res.send({ token: createToken(existingUser) });
               });
             });
           });
@@ -309,12 +310,12 @@ router.post('/auth/twitter', function(req, res) {
             }
 
             var user = new User();
-            user.twitter.id = profile.id;
-            user.twitter.email = profile.email;
-            user.twitter.displayName = profile.name;
-            user.twitter.picture = profile.profile_image_url_https.replace('_normal', '');
-            user.twitter.accessToken = profile.accessToken
-            user.save(function() {
+            existingUser.twitter.id = profile.id;
+            existingUser.twitter.email = profile.email;
+            existingUser.twitter.displayName = profile.name;
+            existingUser.twitter.picture = profile.profile_image_url_https.replace('_normal', '');
+            existingUser.twitter.accessToken = profile.accessToken
+            existingUser.save(function() {
               res.send({ token: createToken(user) });
             });
           });
@@ -327,20 +328,14 @@ router.post('/auth/twitter', function(req, res) {
 var client = new Twitter({
   consumer_key: 'HxYPEZHZ0NHd2ugkTv3673Q1N',
   consumer_secret: process.env.TWITTER_CLIENT_SECRET,
-  access_token_key: '770331880390467584-Je5HUzMal5ZIauw8aXlqPVGjq76fVb6',
-  access_token_secret: 'B6aOKqTn4oXV1kvZN0pkBNAdqT7c9qSPiyGDm1aQess8P'
+  access_token_key: '770331880390467584-2NNGsgM7BusC3Lb6fQRng4TwG6IeL5Q',
+  access_token_secret: 'O127bXX7s3FroQtBLCbKQqA4aMpa3Z6UQkyJJ5c32vkHa'
 })
 
 router.get('/api/twitter/feed', isAuthenticated, function(req, res) {
 
-  client.get('statuses/home_timeline', {screen_name: '_AndrewFranklin'}, function(err, tweets, response) {
+  client.get('statuses/home_timeline', {screen_name: req.user.twitter.displayName}, function(err, tweets, response) {
     if (err) console.log(err);
-    tweets.forEach(function(tweet) {
-      console.log('user: {', tweet.user, '}');
-    })
-    tweets.forEach(function(tweet) {
-      console.log('text: {', tweet.text, '}');
-    })
     res.send(tweets)
   })
 })
